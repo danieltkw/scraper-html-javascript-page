@@ -68,9 +68,7 @@ def configure_driver():
 
 # ---------------------------------------------------------------
 # Chosen NIF
-# 222490497
-# 271970278
-# 307277003
+
 # ---------------------------------------------------------------
 
 # ---------------------------------------------------------------
@@ -164,8 +162,8 @@ def initialize_system(frontend):
         # If user doesn't enter anything, use default values
         if not username or not passw:
             frontend.update_status("Utilizador e palavra-passe predefinidos")
-            username = '13986'
-            passw = 'ativoe'
+            username = ''
+            passw = ''
         
         frontend.update_status("Insira um NIF ou escolha uma opção:")
         # Prompt the user to enter a NIF or use a default value from a .csv file
@@ -175,7 +173,7 @@ def initialize_system(frontend):
             # Code will search for a .csv file with default NIF values, if not found, it will use a default value
             frontend.update_status("NIF predefinido (planilha ou escolha manual)")
             valid_nifs = y_save_error_excep.open_nif_csv()
-            # nif = '271970278'
+            # nif = ''
             # Chose the first number of nif from the valid_nifs list, and convert it to string
             #nif = str(valid_nifs['NIF'].iloc[0])
             nif = valid_nifs
@@ -208,22 +206,22 @@ def initialize_system(frontend):
 # -----------------------------------------------------------------------------------
 # Check user credentials
 def check_credentials():
-    # 11234261
+    # 
     print("Esta autorizado por PEDRO MIGUEL CAMARA LOPES?")
     bi_cc = input("Se sim, digite o BI/CC: ")
-    if bi_cc != '11234261':
+    if bi_cc != '':
         print("Acesso não autorizado. BI/CC incorreto.")
         sys.exit(1)
     
-    # 222490497
+    # 
     nif = input("Digite o NIF: ")
-    if nif != '222490497':
+    if nif != '':
         print("Acesso não autorizado. NIF incorreto.")
         sys.exit(1)
 
-    # 516106228
+    # 
     nipc = input("Digite o NIPC: ")
-    if nipc != '516106228':
+    if nipc != '':
         print("Acesso não autorizado. NIPC incorreto.")
         sys.exit(1)
 
