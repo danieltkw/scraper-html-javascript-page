@@ -31,8 +31,8 @@ import c_navigation
 def login(driver, username, password, nif, wt, run_directory):
 
     # Clear screen terminal 
-    y_save_error_excep.clear_screen  
-    print("1:On login")    
+    #y_save_error_excep.clear_screen  
+    print(" :On login")    
         
     try:
 
@@ -40,10 +40,10 @@ def login(driver, username, password, nif, wt, run_directory):
         time.sleep(wt)  # Sleep for a duration that ensures the next page or form is loaded
         
         # Website
-        driver.get('https://www.sigo.pt/Login.jsp')
+        #driver.get('https://www.sigo.pt/Login.jsp')
 
         # Wait for the initial animation or load
-        time.sleep(wt)  # Sleep for 2 seconds to wait for the cursor to be in the login field
+        #time.sleep(wt)  # Sleep for 2 seconds to wait for the cursor to be in the login field
 
         # Assuming the cursor is in the username field on page load,
         # we send the username, a Tab key to switch to the password field, and then the password

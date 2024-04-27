@@ -32,19 +32,28 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
 # ---------------------------------------------------------------
 
+
+
 # ---------------------------------------------------------------
 # Helper function to get the maximum page number
 def get_max_page_number(driver, wait):
-    
-    # Wait for the paginator to be present
-    paginator = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-paginator-pages")))
-    # Use a more specific selector if possible to only find elements representing pages
-    page_xpaths = paginator.find_elements(By.CSS_SELECTOR, ".ui-paginator-page.ui-state-default.ui-corner-all")
-    # The total number of pages is directly the count of these elements
-    max_page_number = len(page_xpaths)
-    print(page_xpaths)
 
-    return max_page_number, page_xpaths     
+    try:
+        # Specific container selector for the paginator
+        paginator_container_selector = "div#color-trs\\:j_idt99\\:j_idt125\\:j_idt126_paginator_bottom.ui-paginator.ui-paginator-bottom.ui-widget-header.ui-corner-bottom"
+
+        # Wait for the specific container to be present
+        paginator_container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, paginator_container_selector)))
+
+        # Within this container, find elements representing pages
+        page_xpaths = paginator_container.find_elements(By.CSS_SELECTOR, ".ui-paginator-page.ui-state-default.ui-corner-all")
+        max_page_number = len(page_xpaths) if page_xpaths else 1  # Ensure there's at least one page
+
+    except TimeoutException:
+        # Handle the case where the paginator is not found within the timeout
+        max_page_number = 1  # Assume there is only one page if no paginator is found
+
+    return max_page_number    
 # ---------------------------------------------------------------   
    
 # --------------------------------------------------------------- 
@@ -106,129 +115,150 @@ def extract_data_from_page(soup, table_id):
     return extracted_data
 # ---------------------------------------------------------------
 
-# ---------------------------------------------------------------
-def navigate_and_collect_data(driver, wait, run_directory, table_id):
-    extracted_data = []
-    page_number = 1  # Start with the first page
-    while True:
-        try:
-            # Check if pagination is available and if there's a next page
-            next_page_btn = driver.find_element(By.XPATH, '//a[@aria-label="Next page"]')
-            if not next_page_btn.is_enabled():
-                break  # No more pages
-
-            # Extract data from the current page using the given table_id
-            courses_table_html = wait.until(
-                EC.presence_of_element_located((By.ID, table_id))
-            ).get_attribute('outerHTML')
-            soup = BeautifulSoup(courses_table_html, 'html.parser')
-            extracted_data.extend(extract_data_from_page(soup, table_id))
-
-            # Navigate to the next page
-            next_page_btn.click()
-            page_number += 1
-            wait.until(EC.staleness_of(courses_table_html))  # Wait for the old table to go stale
-            
-        except NoSuchElementException:
-            # If there's no next page button, break from the loop
-            break
-        except TimeoutException as e:
-            # Handle cases where the page did not load in time
-            y_save_error_excep.handle_exception(e, driver, run_directory)  
-            break
-        
-    return extracted_data
-# ---------------------------------------------------------------
+# final_nif_results = [] is a global list for store all nif results
+global_final_nif_results = []
+name_nif_list = [] 
 
 # ---------------------------------------------------------------    
 # Function to extract and save data to CSV files
-def extract_and_save_data(driver, wait, run_directory, wt, nif=None, name=None, sigo_number=None):
+def extract_and_save_data(driver, wait, run_directory, wt, main_tab_handle, nif=None, next_nif = None, name=None, sigo_number=None):
     
-    # Beggin the code
+
     y_save_error_excep.clear_screen()
     print("3: On data extraction")
-    
-    # Initialize the extracted data list outside the loop
-    wait = WebDriverWait(driver, 10)  # Adjust the timeout as necessary
-    error_occurred = False  # Initialize a flag to check if an error occurred
-    
-    # Define headers based on the expected columns and file path
-    headers = ['Código', 'Unidade', 'Duração', 'Data de Certificação', 'Estado', 'Pontos de Crédito']
+
+    # Show current NIF
+
+    print(f"Processing NIF: {nif}")
+    print(f"Processing NIF: {next_nif}")
+
+
+    wait = WebDriverWait(driver, 10)
+    error_occurred = False
+
+    headers = ['Codigo', 'Unidade', 'Duracao', 'Data de Certificacao', 'Estado', 'Pontos de Credito']
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    csv_filename = os.path.join(run_directory, f"cdg_{timestamp}.csv")
-    
-    # Check if there is more than one page
-    max_page_number, page_xpaths = get_max_page_number(driver, wait)
+    csv_filename = os.path.join(run_directory, f"{next_nif}_cdg_{timestamp}.csv")
+
+    max_page_number = get_max_page_number(driver, wait)
     print(f"Total pages: {max_page_number}")
+    # sleep for 10s for testing
+    #time.sleep(10)
 
-    # Initialize the extracted data list outside the loop
+    # 233517910 catia 
+
     extracted_data_escolar = []
+    name_nif = [name, next_nif] 
 
-    # Find tables dynamically based on the known titles
-    escolar_table = wait.until(EC.presence_of_element_located((By.XPATH, "//span[contains(., 'Componente de formação Escolar/Base') or contains(., 'Componente de formação Profissional/Tecnológica')]/ancestor::div[contains(@id, 'j_idt')]")))
-    
-    # Extract data from tables
-    extracted_data_escolar = extract_data_from_table(escolar_table) if escolar_table else []
+    # init global variable final_nif_results = [] to store a list with everything 
+    global global_final_nif_results 
+    global name_nif_list
 
+    global_final_nif_results.append(extracted_data_escolar)
+    name_nif_list.append(name_nif)  # Store it in the global li
 
-    try:
-        for i in range(1, max_page_number + 1):
-            try:
-                # Wait for the paginator container to be present
-                paginator = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "ui-paginator-pages"))
-                )
+    if max_page_number == 1:
+        escolar_table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//span[contains(., 'Componente de formação Escolar/Base') or contains(., 'Componente de formação Profissional/Tecnológica')]/ancestor::div[contains(@id, 'j_idt')]")))
+        new_data = extract_data_from_table(escolar_table)
+        extracted_data_escolar.extend(new_data)
+        y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename, next_nif, name)
+        # name_nif stores the moment nif and name, and store in the list of name_nif for pass to the final csv
+        name_nif = [next_nif, name]
+        name_nif.append(name_nif) 
+        y_save_error_excep.save_final_csv(global_final_nif_results, run_directory, name_nif_list)
+
+        c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)    
+
+    if max_page_number > 1:
+        try:
+            for i in range(2, max_page_number + 1):
+                paginator_container_selector = "div#color-trs\\:j_idt99\\:j_idt125\\:j_idt126_paginator_bottom.ui-paginator.ui-paginator-bottom.ui-widget-header.ui-corner-bottom"
+                paginator_container = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, paginator_container_selector)))
+        
+                escolar_table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//span[contains(., 'Componente de formação Escolar/Base') or contains(., 'Componente de formação Profissional/Tecnológica')]/ancestor::div[contains(@id, 'j_idt')]")))
+                new_data = extract_data_from_table(escolar_table)
+                extracted_data_escolar.extend(new_data)
+
+                try:
+                    if i <= max_page_number:
+                        page_number_element = paginator_container.find_element(By.XPATH, f".//span[@class='ui-paginator-page ui-state-default ui-corner-all'][text()='{i}']")
+                        driver.execute_script("arguments[0].click();", page_number_element)
+                        
+                        WebDriverWait(driver, 10).until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, paginator_container_selector + " .ui-paginator-page.ui-state-active"), str(i)))
+
+                        escolar_table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//span[contains(., 'Componente de formação Escolar/Base') or contains(., 'Componente de formação Profissional/Tecnológica')]/ancestor::div[contains(@id, 'j_idt')]")))
+                        new_data = extract_data_from_table(escolar_table)
+                        extracted_data_escolar.extend(new_data)
+
+                        # name_nif stores the moment nif and name, and store in the list of name_nif for pass to the final csv
+                        new_data = extract_data_from_table(escolar_table)
+                        extracted_data_escolar.extend(new_data)
+                        
+                        # sleep to wait page load 
+                        time.sleep(1)   
+                        
+                    else:
+                        print(f"Reached the last page: {i-1}. No further pages to navigate.")
+                        break
+                except Exception as e:
+                    print(f"Could not navigate to page {i} or extract data. Error: {e}")
+
+            #y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename, next_nif, name)
+        
+        except Exception as e:
+            error_occurred = True
+            print(f"An unexpected error occurred during pagination or data extraction. Error: {e}")
+            y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename, next_nif, name)
+            y_save_error_excep.handle_exception(e, driver, run_directory)
+
+            # nif is a data frame with NIFs
+            # Check if the next_nif has already been processed, comparing with the last nif on the list, if not, go switch tab to navigate_to_formandos_e_inscricoes
+
+            if next_nif != nif[-1]:
+                driver.switch_to.window(driver.window_handles[-1])
+                c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+            else:
+                print("E: All NIFs have been processed.")
+                y_save_error_excep.save_final_csv(global_final_nif_results, run_directory, name_nif_list)
                 
-                # Find the page link by text, which should work regardless of the hover state
-                page_element_xpath = f"//span[contains(@class, 'ui-paginator-page')][not(contains(@class, 'ui-state-hover'))][text()='{i}']"
-                page_elements = paginator.find_elements(By.XPATH, page_element_xpath)
                 
-                # There should be only one element matching the page number without the hover state
-                if len(page_elements) == 1:
-                    page_element_to_click = page_elements[0]
-                    driver.execute_script("arguments[0].click();", page_element_to_click)
-                    
-                    # Wait for the active page number to reflect the clicked page
-                    WebDriverWait(driver, 10).until(
-                        EC.text_to_be_present_in_element(
-                            (By.XPATH, f"//span[@class='ui-paginator-page ui-state-active'][text()='{i}']"),
-                            str(i)
-                        )
-                    )
-                    
-                    # Re-find the escolar_table for the new page content
-                    escolar_table = WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "your_table_css_selector"))
-                    )
-                    
-                    # Extract and append new data from the table
-                    new_data = extract_data_from_table(escolar_table)
-                    extracted_data_escolar.extend(new_data)
-                else:
-                    raise Exception(f"Expected one element for page {i} but found {len(page_elements)}")
 
-           
-    except TimeoutException as e:
-        print(f"TimeoutException: An element could not be found or interacted with. Error: {e}")
-        y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename)
-        y_save_error_excep.handle_exception(e, driver, run_directory)
-        c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
-    except Exception as e:
-        error_occurred = True  # Set the flag if an error occurs
-        print(f"An unexpected error occurred. Error: {e}")
-        y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename)
-        y_save_error_excep.handle_exception(e, driver, run_directory)
-        c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+            c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
 
-    finally: 
-        # Save combined data to CSV
-        y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename)
-    c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+        except TimeoutError or TimeoutException as e:
+            error_occurred = True
+            print(f"An Time out error occurred during pagination or data extraction. Error: {e}")
+            y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename, next_nif, name)
+            y_save_error_excep.handle_exception(e, driver, run_directory)
+
+            if next_nif != nif[-1]:
+                driver.switch_to.window(driver.window_handles[-1])
+                c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+            else:
+                print("Te: All NIFs have been processed.")
+                
+
+            c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+            
+        finally:
+            y_save_error_excep.save_csv(extracted_data_escolar, headers, csv_filename, next_nif, name)
 
     if error_occurred:
-        print(f"Data partially extracted and saved to '{csv_filename}' due to an error. Total {len(extracted_data_escolar)} records found.")
+        print(f"Data partially extracted and saved to '{csv_filename}' due to an error. Please check the error log.")
+        y_save_error_excep.save_final_csv(global_final_nif_results, run_directory, name_nif_list)
     else:
-        print(f"Data extracted and saved to '{csv_filename}'. Total {len(extracted_data_escolar)} records found.")# ---------------------------------------------------------------
+        print(f"Data extracted and saved to '{csv_filename}' - going back if there is more NIF to process.")
+    
+
+        # Check if the next_nif has already been processed, comparing with the last nif on the list, if not, go switch tab to navigate_to_formandos_e_inscricoes 
+        if next_nif != nif[-1]:
+            # Switch back to the main tab
+            driver.switch_to.window(main_tab_handle)
+            c_navigation.navigate_to_formandos_e_inscricoes(driver, nif, wt, run_directory)
+        else:
+            print("3: All NIFs have been processed.")
+            y_save_error_excep.save_final_csv(global_final_nif_results, run_directory, name_nif_list)      
 # ---------------------------------------------------------------
 
 # ---------------------------------------------------------------
